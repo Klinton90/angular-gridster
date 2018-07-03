@@ -1542,9 +1542,11 @@
 							return false;
 						}
 
-						// only works if you have jQuery
-						if ($target.closest && $target.closest('.gridster-no-drag').length) {
-							return false;
+						if ($target.closest) {
+							var tmp = $target.closest('.gridster-no-drag');
+							if (tmp.length || tmp instanceof Element) {
+								return false;
+							}
 						}
 
 						// apply drag handle filter
