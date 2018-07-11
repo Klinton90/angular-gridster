@@ -65,21 +65,24 @@
 				 */
 				angular.extend(this, gridsterConfig);
 
+				var originalMaxRows = this.maxRows;
+
 				this.resizable = angular.extend({}, gridsterConfig.resizable || {});
 				this.draggable = angular.extend({}, gridsterConfig.draggable || {});
 
-				var flag = false;
-				this.layoutChanged = function() {
-					if (flag) {
+				var layoutChangedInProgress = false;
+				this.layoutChanged = function(heightDelta, callback) {
+					if (layoutChangedInProgress) {
 						return;
 					}
-					flag = true;
+					layoutChangedInProgress = true;
 					$timeout(function() {
-						flag = false;
 						if (gridster.loaded) {
 							gridster.floatItemsUp();
 						}
-						gridster.updateHeight(gridster.movingItem ? gridster.movingItem.getSizeY() : 0);
+						gridster.updateHeight(heightDelta);
+						callback && callback();
+						layoutChangedInProgress = false;
 					}, 30);
 				};
 
@@ -106,6 +109,10 @@
 					}
 				};
 
+				this.isMovingOrResizing = function(item) {
+					return this.movingOrResizingItem === item;
+				};
+
 				/**
 				 * Overrides default options
 				 *
@@ -130,6 +137,8 @@
 
 					angular.extend(this, options);
 
+					originalMaxRows = this.maxRows;
+
 					if (!this.margins || this.margins.length !== 2) {
 						this.margins = [0, 0];
 					} else {
@@ -145,13 +154,14 @@
 				/**
 				 * Check if item can occupy a specified position in the grid
 				 *
-				 * @param {Object} item The item in question
+				 * @param {Number} sizeX The Item width
+				 * @param {Number} sizeY The Item height
 				 * @param {Number} row The row index
 				 * @param {Number} column The column index
 				 * @returns {Boolean} True if if item fits
 				 */
-				this.canItemOccupy = function(item, row, column) {
-					return row > -1 && column > -1 && item.getSizeX() + column <= this.columns && item.getSizeY() + row <= this.maxRows;
+				this.canItemOccupy = function(sizeX, sizeY, row, column) {
+					return row > -1 && column > -1 && sizeX + column <= this.columns && sizeY + row <= this.maxRows;
 				};
 
 				/**
@@ -165,7 +175,7 @@
 						for (var colIndex = 0; colIndex < this.columns; ++colIndex) {
 							// only insert if position is not already taken and it can fit
 							var items = this.getItems(rowIndex, colIndex, item.getSizeX(), item.getSizeY(), item);
-							if (items.length === 0 && this.canItemOccupy(item, rowIndex, colIndex)) {
+							if (items.length === 0 && this.canItemOccupy(item.getSizeX(), item.getSizeY(), rowIndex, colIndex)) {
 								this.putItem(item, rowIndex, colIndex);
 								return;
 							}
@@ -263,7 +273,6 @@
 				 * @param {number} top
 				 * @param {number} bottom
 				 */
-
 				this.intersect = function(item, left, right, top, bottom) {
 					return (left <= item.col + item.getSizeX() - 1 &&
 						right >= item.col &&
@@ -296,6 +305,7 @@
 							this.allItems.splice(index, 1);
 						}
 					}
+					// Recalculate grid height, based on new set of items
 					this.layoutChanged();
 				};
 
@@ -363,7 +373,7 @@
 					}
 
 					// keep item within allowed bounds
-					if (!this.canItemOccupy(item, row, column)) {
+					if (!this.canItemOccupy(item.getSizeX(), item.getSizeY(), row, column)) {
 						column = Math.min(this.columns - item.getSizeX(), Math.max(0, column));
 						row = Math.min(this.maxRows - item.getSizeY(), Math.max(0, row));
 					}
@@ -399,10 +409,11 @@
 						this.allItems.push(item);
 					}
 
-					if (this.movingItem === item) {
+					if (this.isMovingOrResizing(item)) {
 						this.floatItemUp(item);
 					}
-					this.layoutChanged();
+
+					this.layoutChanged(gridster.movingOrResizingItem ? gridster.movingOrResizingItem.getSizeY() : 0);
 				};
 
 				/**
@@ -558,11 +569,12 @@
 				/**
 				 * Update gridsters height
 				 *
-				 * @param {Number} plus (Optional) Additional height to add
+				 * @param {Number} heightDelta (Optional) Additional height to add
+				 * @param {Any} item (Optional) Item to subtract height from for calculation. Required when `heightDelta` is negative.
 				 */
-				this.updateHeight = function(plus) {
+				this.updateHeight = function(heightDelta, item) {
 					var maxHeight = this.minRows;
-					plus = plus || 0;
+					heightDelta = heightDelta || 0;
 					for (var rowIndex = this.grid.length; rowIndex >= 0; --rowIndex) {
 						var columns = this.grid[rowIndex];
 						if (!columns) {
@@ -570,7 +582,20 @@
 						}
 						for (var colIndex = 0, len = columns.length; colIndex < len; ++colIndex) {
 							if (columns[colIndex]) {
-								maxHeight = Math.max(maxHeight, rowIndex + plus + columns[colIndex].getSizeY());
+								if (heightDelta < 0) {
+									if (item) {
+										if (columns[colIndex] === item) {
+											maxHeight = Math.max(maxHeight, rowIndex + heightDelta + columns[colIndex].getSizeY());
+										} else {
+											maxHeight = Math.max(maxHeight, rowIndex + columns[colIndex].getSizeY());
+										}
+									} else {
+										console.error('Negative `heightDelta` provided and no `item`! That is unexpected behavior. Please inspect your code for errors.');
+										maxHeight = Math.max(maxHeight, rowIndex + (-heightDelta) + columns[colIndex].getSizeY());
+									}
+								} else {
+									maxHeight = Math.max(maxHeight, rowIndex + heightDelta + columns[colIndex].getSizeY());
+								}
 							}
 						}
 					}
@@ -632,7 +657,7 @@
 					 * @returns {Object} style object for preview element
 					 */
 					scope.previewStyle = function() {
-						if (!gridster.movingItem) {
+						if (!gridster.movingOrResizingItem) {
 							return {
 								display: 'none'
 							};
@@ -640,10 +665,10 @@
 
 						return {
 							display: 'block',
-							height: (gridster.movingItem.getSizeY() * gridster.curRowHeight - gridster.margins[0]) + 'px',
-							width: (gridster.movingItem.getSizeX() * gridster.curColWidth - gridster.margins[1]) + 'px',
-							top: (gridster.movingItem.row * gridster.curRowHeight + (gridster.outerMargin ? gridster.margins[0] : 0)) + 'px',
-							left: (gridster.movingItem.col * gridster.curColWidth + (gridster.outerMargin ? gridster.margins[1] : 0)) + 'px'
+							height: (gridster.movingOrResizingItem.getSizeY() * gridster.curRowHeight - gridster.margins[0]) + 'px',
+							width: (gridster.movingOrResizingItem.getSizeX() * gridster.curColWidth - gridster.margins[1]) + 'px',
+							top: (gridster.movingOrResizingItem.row * gridster.curRowHeight + (gridster.outerMargin ? gridster.margins[0] : 0)) + 'px',
+							left: (gridster.movingOrResizingItem.col * gridster.curColWidth + (gridster.outerMargin ? gridster.margins[1] : 0)) + 'px'
 						};
 					};
 				}
@@ -667,7 +692,7 @@
 					controllerAs: 'gridster',
 					compile: function($tplElem) {
 
-						$tplElem.prepend('<div ng-if="gridster.movingItem" gridster-preview></div>');
+						$tplElem.prepend('<div ng-if="gridster.movingOrResizingItem" gridster-preview></div>');
 
 						return function(scope, $elem, attrs, gridster) {
 							gridster.loaded = false;
@@ -689,12 +714,6 @@
 							scope.$watch(function() {
 								return gridster.gridHeight;
 							}, updateHeight);
-
-							scope.$watch(function() {
-								return gridster.movingItem;
-							}, function() {
-								gridster.updateHeight(gridster.movingItem ? gridster.movingItem.getSizeY() : 0);
-							});
 
 							function refresh(config) {
 								gridster.setOptions(config);
@@ -797,7 +816,7 @@
 							var resize = function() {
 								var width = $elem[0].offsetWidth || parseInt($elem.css('width'), 10);
 
-								if (!width || width === prevWidth || gridster.movingItem) {
+								if (!width || width === prevWidth || gridster.movingOrResizingItem) {
 									return;
 								}
 								prevWidth = width;
@@ -897,10 +916,6 @@
 				};
 			};
 
-			this.isMoving = function() {
-				return this.gridster.movingItem === this;
-			};
-
 			/**
 			 * Set the items position
 			 *
@@ -910,7 +925,7 @@
 			this.setPosition = function(row, column) {
 				this.gridster.putItem(this, row, column);
 
-				if (!this.isMoving()) {
+				if (!this.gridster.isMovingOrResizing(this)) {
 					this.setElementPosition();
 				}
 			};
@@ -920,21 +935,21 @@
 			 *
 			 * @param {String} key Can be either "x" or "y"
 			 * @param {Number} value The size amount
-			 * @param {Boolean} preventMove
 			 */
-			this.setSize = function(key, value, preventMove) {
-				var auto = false;
-				if (value === 'auto' && key === 'Y') {
-					auto = true;
-					value = this.getSizeY();
-				}
-
+			this.setSize = function(key, value) {
 				key = key.toUpperCase();
 				var camelCase = 'size' + key,
 					titleCase = 'Size' + key;
 				if (value === '') {
 					return;
 				}
+
+				var auto = false;
+				if (value === 'auto') {
+					auto = true;
+					value = this["get" + titleCase]();
+				}
+
 				value = parseInt(value, 10);
 				if (isNaN(value) || value === 0) {
 					value = this.gridster['default' + titleCase];
@@ -962,19 +977,18 @@
 
 				value = Math.max(Math.min(value, max), min);
 
-				var changed = (this[camelCase] !== value || (this['old' + titleCase] && this['old' + titleCase] !== value));
-				this['old' + titleCase] = this[camelCase] = value;
+				var changed = value - this[camelCase];
+				if (!changed && this['old' + titleCase]) {
+					changed = value - this['old' + titleCase];
+				}
+				this['old' + titleCase] = value;
 
-				if (auto) {
-					this.sizeY = 'auto'; // reset auto after calculations
+				if (!auto) {
+					this[camelCase] = value;
 				}
 
-				if (!this.isMoving()) {
+				if (!this.gridster.isMovingOrResizing(this)) {
 					this['setElement' + titleCase]();
-				}
-				if (!preventMove && changed) {
-					this.gridster.moveOverlappingItems(this);
-					this.gridster.layoutChanged();
 				}
 
 				return changed;
@@ -984,20 +998,18 @@
 			 * Sets the items sizeY property
 			 *
 			 * @param {Number} rows
-			 * @param {Boolean} preventMove
 			 */
-			this.setSizeY = function(rows, preventMove) {
-				return this.setSize('Y', rows, preventMove);
+			this.setSizeY = function(rows) {
+				return this.setSize('Y', rows);
 			};
 
 			/**
 			 * Sets the items sizeX property
 			 *
 			 * @param {Number} columns
-			 * @param {Boolean} preventMove
 			 */
-			this.setSizeX = function(columns, preventMove) {
-				return this.setSize('X', columns, preventMove);
+			this.setSizeX = function(columns) {
+				return this.setSize('X', columns);
 			};
 
 			/**
@@ -1014,6 +1026,9 @@
 			 * Gets the items sizeX property
 			 */
 			this.getSizeX = function() {
+				if (this.sizeX === 'auto') {
+					return this.gridster.pixelsToColumns((this.$element[0].offsetWidth + this.gridster.margins[0]), true);
+				}
 				return this.sizeX;
 			};
 
@@ -1422,8 +1437,9 @@
 
 					function dragStart(event) {
 						$el.addClass('gridster-item-moving');
-						gridster.movingItem = item;
+						gridster.movingOrResizingItem = item;
 
+						//Reserve space for whole item Height at the bottom of the grid, so user can drop it there
 						gridster.updateHeight(item.getSizeY());
 						scope.$apply(function() {
 							if (gridster.draggable && gridster.draggable.start) {
@@ -1542,7 +1558,9 @@
 							}
 						}
 
-						gridster.movingItem = null;
+						gridster.movingOrResizingItem = null;
+						// Release reserved space
+						gridster.updateHeight();
 						item.setPosition(item.row, item.col);
 
 						scope.$apply(function() {
@@ -1746,6 +1764,7 @@
 
 				function ResizeHandle(handleClass) {
 
+					this.hClass = handleClass;
 					var hClass = handleClass;
 
 					var elmX, elmY, elmW, elmH,
@@ -1775,11 +1794,12 @@
 						$el.addClass('gridster-item-moving');
 						$el.addClass('gridster-item-resizing');
 
-						gridster.movingItem = item;
+						gridster.movingOrResizingItem = item;
 
 						item.setElementSizeX();
 						item.setElementSizeY();
 						item.setElementPosition();
+						// Reserve space for placeholder slot, so user can move mouse without overlapping item with page content
 						gridster.updateHeight(1);
 
 						scope.$apply(function() {
@@ -1821,13 +1841,15 @@
 							sizeY = gridster.pixelsToRows(elmH, true);
 						}
 
-
-						var canOccupy = row > -1 && col > -1 && sizeX + col <= gridster.columns && sizeY + row <= gridster.maxRows;
-						if (canOccupy && (gridster.pushing !== false || gridster.getItems(row, col, sizeX, sizeY, item).length === 0)) {
+						if (gridster.canItemOccupy(sizeX, sizeY, row, col) && (gridster.pushing !== false || gridster.getItems(row, col, sizeX, sizeY, item).length === 0)) {
 							item.row = row;
 							item.col = col;
-							item.sizeX = sizeX;
-							item.sizeY = sizeY;
+							if (item.sizeX !== 'auto') {
+								item.sizeX = sizeX;
+							}
+							if (item.sizeY !== 'auto') {
+								item.sizeY = sizeY;
+							}
 						}
 						var isChanged = item.row !== oldRow || item.col !== oldCol || item.getSizeX() !== oldSizeX || item.getSizeY() !== oldSizeY;
 
@@ -1844,11 +1866,20 @@
 						$el.removeClass('gridster-item-moving');
 						$el.removeClass('gridster-item-resizing');
 
-						gridster.movingItem = null;
+						gridster.movingOrResizingItem = null;
 
 						item.setPosition(item.row, item.col);
-						item.setSizeY(item.sizeY);
-						item.setSizeX(item.sizeX);
+						var changedX = item.setSizeY(item.sizeY);
+						var changedY = item.setSizeX(item.sizeX);
+
+						if (changedX || changedY) {
+							gridster.moveOverlappingItems(item);
+							// Recalculate grid height, based on new sizes
+							gridster.layoutChanged();
+						} else {
+							// Release reserved space
+							gridster.updateHeight();
+						}
 
 						scope.$apply(function() {
 							if (gridster.resizable && gridster.resizable.stop) {
@@ -1956,12 +1987,17 @@
 						}
 
 						// set new position
-						$el.css({
+						var newStyle = {
 							'top': elmY + 'px',
-							'left': elmX + 'px',
-							'width': elmW + 'px',
-							'height': elmH + 'px'
-						});
+							'left': elmX + 'px'
+						};
+						if (item.sizeY !== 'auto') {
+							newStyle.height = elmH + 'px';
+						}
+						if (item.sizeX !== 'auto') {
+							newStyle.width = elmW + 'px';
+						}
+						$el.css(newStyle);
 
 						resize(e);
 
@@ -2025,8 +2061,11 @@
 					if (enabled) {
 						return;
 					}
-					for (var c = 0, l = handles.length; c < l; c++) {
-						handles[c].enable();
+					var _handles = handles.filter(function (_handle) {
+						return !((item.sizeX === 'auto' && ['n', 's'].indexOf(_handle.hClass) === -1) || (item.sizeY === 'auto' && ['e', 'w'].indexOf(_handle.hClass) === -1));
+					});
+					for (var c = 0, l = _handles.length; c < l; c++) {
+						_handles[c].enable();
 					}
 					enabled = true;
 				};
@@ -2196,18 +2235,34 @@
 						}, positionChanged);
 
 						function sizeChanged() {
-							var changedX = item.setSizeX(item.sizeX, true);
+							var changedX = item.setSizeX(item.sizeX);
 							if (changedX && $getters.sizeX && $getters.sizeX.assign) {
 								$getters.sizeX.assign(scope, item.sizeX);
 							}
-							var changedY = item.setSizeY(item.sizeY, true);
+							var changedY = item.setSizeY(item.sizeY);
 							if (changedY && $getters.sizeY && $getters.sizeY.assign) {
 								$getters.sizeY.assign(scope, item.sizeY);
 							}
 
 							if (changedX || changedY) {
+								if (gridster.movingOrResizingItem) {
+									var prevGridHeight = gridster.gridHeight;
+									// Resizing item:
+									//  - on increase: add changed amount of slots
+									//  - on decrease: render as per content sizes, but reserve 1 placeholder slot so user can move mouse without overlapping item with page content
+									gridster.layoutChanged((changedY > 0 ? changedY : 1), function () {
+										if (changedY > 0 && gridster.gridHeight === prevGridHeight) {
+											// It may happen, that user resize item somewhere in the middle of the grid.
+											// In that case we cannot determine if we need placeholder slot prior to calculation is finished.
+											// If size didn't change - reserve 1 placeholder slot so user can move mouse without overlapping item with page content
+											gridster.layoutChanged(changedY + 1);
+										}
+									});
+								} else {
+									// Recalculate grid height, based on new set of items
+									gridster.layoutChanged();
+								}
 								item.gridster.moveOverlappingItems(item);
-								gridster.layoutChanged();
 								scope.$broadcast('gridster-item-resized', item);
 							}
 						}
@@ -2290,6 +2345,6 @@
 			};
 		})
 
-	;
+		;
 
 }));
