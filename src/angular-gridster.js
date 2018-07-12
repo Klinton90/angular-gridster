@@ -81,7 +81,9 @@
 							gridster.floatItemsUp();
 						}
 						gridster.updateHeight(heightDelta);
-						callback && callback();
+						if (callback) {
+							callback();
+						}
 						layoutChangedInProgress = false;
 					}, 30);
 				};
@@ -947,7 +949,7 @@
 				var auto = false;
 				if (value === 'auto') {
 					auto = true;
-					value = this["get" + titleCase]();
+					value = this['get' + titleCase]();
 				}
 
 				value = parseInt(value, 10);
@@ -2061,7 +2063,7 @@
 					if (enabled) {
 						return;
 					}
-					var _handles = handles.filter(function (_handle) {
+					var _handles = handles.filter(function(_handle) {
 						return !((item.sizeX === 'auto' && ['n', 's'].indexOf(_handle.hClass) === -1) || (item.sizeY === 'auto' && ['e', 'w'].indexOf(_handle.hClass) === -1));
 					});
 					for (var c = 0, l = _handles.length; c < l; c++) {
@@ -2250,7 +2252,7 @@
 									// Resizing item:
 									//  - on increase: add changed amount of slots
 									//  - on decrease: render as per content sizes, but reserve 1 placeholder slot so user can move mouse without overlapping item with page content
-									gridster.layoutChanged((changedY > 0 ? changedY : 1), function () {
+									gridster.layoutChanged((changedY > 0 ? changedY : 1), function() {
 										if (changedY > 0 && gridster.gridHeight === prevGridHeight) {
 											// It may happen, that user resize item somewhere in the middle of the grid.
 											// In that case we cannot determine if we need placeholder slot prior to calculation is finished.
@@ -2345,6 +2347,6 @@
 			};
 		})
 
-		;
+	;
 
 }));
