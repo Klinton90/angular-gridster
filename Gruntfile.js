@@ -120,7 +120,7 @@ module.exports = function(grunt) {
 			}
 		},
 		zip: {
-			'temp/angular-gridster-<%=pkg.version%>.zip': ['*']
+			'temp/angular-gridster-<%=pkg.version%>.zip': ['*', 'demo/*', 'dist/*', 'src/*', 'test/*', '!temp', '!node_modules']
 		}
 	});
 
