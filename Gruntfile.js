@@ -118,10 +118,14 @@ module.exports = function(grunt) {
 				files: ['src/*', 'test/**/*.js'],
 				tasks: ['jsbeautifier', 'jshint', 'uglify', 'protractor']
 			}
+		},
+		zip: {
+			'temp/angular-gridster-<%=pkg.version%>.zip': ['*']
 		}
 	});
 
 	grunt.registerTask('default', ['jsbeautifier', 'jshint', 'uglify', 'less']);
+	grunt.registerTask('package', ['zip']);
 
 	grunt.registerTask('dev', ['connect:dev', 'karma:unit:start', 'watch:dev']);
 	grunt.registerTask('e2e', ['connect:cli', 'protractor', 'watch:e2e']);
