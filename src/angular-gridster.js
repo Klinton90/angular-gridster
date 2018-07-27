@@ -892,6 +892,8 @@
 			this.minSizeY = 0;
 			this.maxSizeX = null;
 			this.maxSizeY = null;
+			this.restrictByContentX = false;
+			this.restrictByContentY = false;
 
 			this.init = function($element, gridster) {
 				this.$element = $element;
@@ -1771,6 +1773,9 @@
 
 					var elmX, elmY, elmW, elmH,
 
+						lastElmW,
+						lastElmH,
+
 						mouseX = 0,
 						mouseY = 0,
 						lastMouseX = 0,
@@ -1787,6 +1792,19 @@
 					};
 					var getMinWidth = function() {
 						return (item.minSizeX ? item.minSizeX : 1) * gridster.curColWidth - gridster.margins[1];
+					};
+
+					var isRestrictedH = function() {
+						return item.restrictByContentY && item.$element[0].scrollHeight - lastElmH > 0;
+					};
+					var isRestrictedW = function() {
+						return item.restrictByContentX && item.$element[0].scrollWidth - lastElmW > 0;
+					};
+					var getElmHByContent = function() {
+						return !isRestrictedH() ? elmH : item.$element[0].scrollHeight;
+					};
+					var getElmWByContent = function() {
+						return !isRestrictedW() ? elmW : item.$element[0].scrollWidth;
 					};
 
 					var originalWidth, originalHeight;
@@ -1834,13 +1852,13 @@
 						var sizeX = item.getSizeX();
 						// only change row if grabbing left or right edge
 						if (['n', 's'].indexOf(handleClass) === -1) {
-							sizeX = gridster.pixelsToColumns(elmW, true);
+							sizeX = gridster.pixelsToColumns(getElmWByContent(), true);
 						}
 
 						var sizeY = item.getSizeY();
 						// only change row if grabbing top or bottom edge
 						if (['e', 'w'].indexOf(handleClass) === -1) {
-							sizeY = gridster.pixelsToRows(elmH, true);
+							sizeY = gridster.pixelsToRows(getElmHByContent(), true);
 						}
 
 						if (gridster.canItemOccupy(sizeX, sizeY, row, col) && (gridster.pushing !== false || gridster.getItems(row, col, sizeX, sizeY, item).length === 0)) {
@@ -1945,6 +1963,9 @@
 						var dY = diffY,
 							dX = diffX;
 
+						lastElmW = elmW;
+						lastElmH = elmH;
+
 						if (hClass.indexOf('n') >= 0) {
 							if (elmH - dY < getMinHeight()) {
 								diffY = elmH - getMinHeight();
@@ -1953,7 +1974,9 @@
 								diffY = minTop - elmY;
 								mOffY = dY - diffY;
 							}
-							elmY += diffY;
+							if (!isRestrictedH()) {
+								elmY += diffY;
+							}
 							elmH -= diffY;
 						}
 						if (hClass.indexOf('s') >= 0) {
@@ -1974,7 +1997,9 @@
 								diffX = minLeft - elmX;
 								mOffX = dX - diffX;
 							}
-							elmX += diffX;
+							if (!isRestrictedW()) {
+								elmX += diffX;
+							}
 							elmW -= diffX;
 						}
 						if (hClass.indexOf('e') >= 0) {
@@ -1994,10 +2019,10 @@
 							'left': elmX + 'px'
 						};
 						if (item.sizeY !== 'auto') {
-							newStyle.height = elmH + 'px';
+							newStyle.height = getElmHByContent() + 'px';
 						}
 						if (item.sizeX !== 'auto') {
-							newStyle.width = elmW + 'px';
+							newStyle.width = getElmWByContent() + 'px';
 						}
 						$el.css(newStyle);
 
@@ -2181,7 +2206,7 @@
 							if (typeof options[aspect] === 'string' && options[aspect] !== 'auto') {
 								// watch the expression in the scope
 								expression = options[aspect];
-							} else if (typeof options[aspect.toLowerCase()] === 'string') {
+							} else if (typeof options[aspect.toLowerCase()] === 'string' && options[aspect.toLowerCase()] !== 'auto') {
 								// watch the expression in the scope
 								expression = options[aspect.toLowerCase()];
 							} else if (optionsKey) {
@@ -2202,6 +2227,13 @@
 
 						for (var i = 0, l = aspects.length; i < l; ++i) {
 							aspectFn(aspects[i]);
+						}
+
+						if (options.restrictByContentX != null) {
+							item.restrictByContentX = options.restrictByContentX;
+						}
+						if (options.restrictByContentY != null) {
+							item.restrictByContentY = options.restrictByContentY;
 						}
 
 						var watchExpressions = '{' + expressions.join(',') + '}';
