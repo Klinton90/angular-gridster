@@ -443,12 +443,13 @@
 				 * @param {Array} ignoreItems
 				 */
 				this.moveOverlappingItems = function(item, ignoreItems) {
+					var _ignoreItems;
 					// don't move item, so ignore it
 					if (!ignoreItems) {
-						ignoreItems = [item];
+						_ignoreItems = [item];
 					} else if (ignoreItems.indexOf(item) === -1) {
-						ignoreItems = ignoreItems.slice(0);
-						ignoreItems.push(item);
+						_ignoreItems = ignoreItems.slice(0);
+						_ignoreItems.push(item);
 					}
 
 					// get the items in the space occupied by the item's coordinates
@@ -457,9 +458,27 @@
 						item.col,
 						item.getSizeX(),
 						item.getSizeY(),
-						ignoreItems
+						_ignoreItems
 					);
-					this.moveItemsDown(overlappingItems, item.row + item.getSizeY(), ignoreItems);
+
+					var topItem = overlappingItems.filter(function(overlappingItem) {
+						return overlappingItem.row < item.row;
+					}).sort(function(a, b) {
+						return b.row - a.row;
+					})[0];
+
+					if (topItem) {
+						var $ignoreItems = ignoreItems ? ignoreItems.slice(0) : null;
+						if ($ignoreItems) {
+							var i = $ignoreItems.indexOf(item);
+							if (i !== -1) {
+								$ignoreItems.splice(i, 1);
+							}
+						}
+						this.moveOverlappingItems(topItem, $ignoreItems);
+					} else {
+						this.moveItemsDown(overlappingItems, item.row + item.getSizeY(), ignoreItems);
+					}
 				};
 
 				/**
