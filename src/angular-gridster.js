@@ -461,24 +461,28 @@
 						_ignoreItems
 					);
 
-					var topItem = overlappingItems.filter(function(overlappingItem) {
-						return overlappingItem.row < item.row;
-					}).sort(function(a, b) {
-						return b.row - a.row;
-					})[0];
+					if (gridster.loaded && !item.isRendered) {
+						var topItem = overlappingItems.filter(function(overlappingItem) {
+							return overlappingItem.row < item.row;
+						}).sort(function(a, b) {
+							return b.row - a.row;
+						})[0];
 
-					if (topItem) {
-						var $ignoreItems = ignoreItems ? ignoreItems.slice(0) : null;
-						if ($ignoreItems) {
-							var i = $ignoreItems.indexOf(item);
-							if (i !== -1) {
-								$ignoreItems.splice(i, 1);
+						if (topItem) {
+							var $ignoreItems = ignoreItems ? ignoreItems.slice(0) : null;
+							if ($ignoreItems) {
+								var i = $ignoreItems.indexOf(item);
+								if (i !== -1) {
+									$ignoreItems.splice(i, 1);
+								}
 							}
+							this.moveOverlappingItems(topItem, $ignoreItems);
+							item.isRendered = true;
+							return;
 						}
-						this.moveOverlappingItems(topItem, $ignoreItems);
-					} else {
-						this.moveItemsDown(overlappingItems, item.row + item.getSizeY(), ignoreItems);
 					}
+
+					this.moveItemsDown(overlappingItems, item.row + item.getSizeY(), _ignoreItems);
 				};
 
 				/**
