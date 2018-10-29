@@ -461,7 +461,7 @@
 						_ignoreItems
 					);
 
-					if (gridster.loaded && !item.isRendered) {
+					if (gridster.loaded && !gridster.movingOrResizingItem) {
 						var topItem = overlappingItems.filter(function(overlappingItem) {
 							return overlappingItem.row < item.row;
 						}).sort(function(a, b) {
