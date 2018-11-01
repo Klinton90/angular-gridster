@@ -127,7 +127,8 @@ module.exports = function(grunt) {
 					archive: 'angular-gridster-<%=pkg.version%>.tgz'
 				},
 				expand: true,
-				src: ['*', 'demo/*', 'dist/*', 'src/*', 'test/*', '!temp', '!node_modules']
+				src: ['*', 'demo/*', 'dist/*', 'src/*', 'test/*', '!temp', '!node_modules'],
+				dest: 'package'
 			}
 		}
 	});
