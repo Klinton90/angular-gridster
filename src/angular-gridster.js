@@ -362,8 +362,9 @@
 				 * @param {Number} row (Optional) Specifies the items row index
 				 * @param {Number} column (Optional) Specifies the items column index
 				 * @param {Array} ignoreItems
+				 * @param {Boolean} isDropAction
 				 */
-				this.putItem = function(item, row, column, ignoreItems) {
+				this.putItem = function(item, row, column, ignoreItems, isDropAction) {
 					// auto place item if no row specified
 					if (typeof row === 'undefined' || row === null) {
 						row = item.row;
@@ -400,7 +401,7 @@
 					item.oldRow = item.row = row;
 					item.oldColumn = item.col = column;
 
-					this.moveOverlappingItems(item, ignoreItems);
+					this.moveOverlappingItems(item, ignoreItems, isDropAction);
 
 					if (!this.grid[row]) {
 						this.grid[row] = [];
@@ -441,8 +442,9 @@
 				 *
 				 * @param {Object} item The item that should remain
 				 * @param {Array} ignoreItems
+				 * @param {Boolean} isDropAction
 				 */
-				this.moveOverlappingItems = function(item, ignoreItems) {
+				this.moveOverlappingItems = function(item, ignoreItems, isDropAction) {
 					var _ignoreItems;
 					// don't move item, so ignore it
 					if (!ignoreItems) {
@@ -461,7 +463,7 @@
 						_ignoreItems
 					);
 
-					if (gridster.loaded && !gridster.movingOrResizingItem) {
+					if (gridster.loaded && !gridster.isMovingOrResizing(item) && !isDropAction) {
 						var topItem = overlappingItems.filter(function(overlappingItem) {
 							return overlappingItem.row < item.row;
 						}).sort(function(a, b) {
@@ -948,9 +950,10 @@
 			 *
 			 * @param {Number} row
 			 * @param {Number} column
+			 * @param {Boolean} isDropAction
 			 */
-			this.setPosition = function(row, column) {
-				this.gridster.putItem(this, row, column);
+			this.setPosition = function(row, column, isDropAction) {
+				this.gridster.putItem(this, row, column, null, isDropAction);
 
 				if (!this.gridster.isMovingOrResizing(this)) {
 					this.setElementPosition();
@@ -1588,7 +1591,7 @@
 						gridster.movingOrResizingItem = null;
 						// Release reserved space
 						gridster.updateHeight();
-						item.setPosition(item.row, item.col);
+						item.setPosition(item.row, item.col, true);
 
 						scope.$apply(function() {
 							if (gridster.draggable && gridster.draggable.stop) {
