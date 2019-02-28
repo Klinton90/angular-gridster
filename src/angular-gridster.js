@@ -2090,8 +2090,10 @@
 							$dragHandle = null;
 						}
 
-						unifiedInput.disable();
-						unifiedInput = undefined;
+						if (unifiedInput) {
+							unifiedInput.disable();
+							unifiedInput = undefined;
+						}
 					};
 
 					this.destroy = function() {
