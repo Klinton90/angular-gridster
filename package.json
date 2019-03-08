@@ -1,6 +1,6 @@
 {
   "name": "angular-gridster",
-  "version": "0.13.19",
+  "version": "0.13.21",
   "description": "This directive gives you gridster behavior",
   "license": "MIT",
   "homepage": "http://manifestwebdesign.github.io/angular-gridster",
@@ -8,7 +8,7 @@
   "devDependencies": {
     "grunt": "^1.0.1",
     "grunt-bump": "0.8.0",
-    "grunt-contrib-compress": "^1.4.3",
+    "grunt-contrib-compress": "~1.4.3",
     "grunt-contrib-concat": "~1.0.1",
     "grunt-contrib-connect": "~1.0.2",
     "grunt-contrib-jshint": "~1.0.0",
