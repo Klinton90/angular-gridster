@@ -6,5 +6,4 @@ nbproject
 coverage
 .idea/
 temp/
-/dist/
 /package-lock.json
