@@ -6,3 +6,4 @@ nbproject
 coverage
 .idea/
 temp/
+/dist/

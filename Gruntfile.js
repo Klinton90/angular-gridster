@@ -119,13 +119,22 @@ module.exports = function(grunt) {
 				tasks: ['jsbeautifier', 'jshint', 'uglify', 'protractor']
 			}
 		},
-		zip: {
-			'temp/angular-gridster-<%=pkg.version%>.zip': ['*', 'demo/*', 'dist/*', 'src/*', 'test/*', '!temp', '!node_modules']
+		compress: {
+			main: {
+				options: {
+					mode: 'tgz',
+					level: 'gzip',
+					archive: 'angular-gridster-<%=pkg.version%>.tgz'
+				},
+				expand: true,
+				src: ['*', 'demo/*', 'dist/*', 'src/*', 'test/*', '!temp', '!node_modules'],
+				dest: 'package'
+			}
 		}
 	});
 
 	grunt.registerTask('default', ['jsbeautifier', 'jshint', 'uglify', 'less']);
-	grunt.registerTask('package', ['zip']);
+	grunt.registerTask('package', ['compress']);
 
 	grunt.registerTask('dev', ['connect:dev', 'karma:unit:start', 'watch:dev']);
 	grunt.registerTask('e2e', ['connect:cli', 'protractor', 'watch:e2e']);
