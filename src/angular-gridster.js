@@ -1032,7 +1032,7 @@
 					this[camelCase] = value;
 				}
 
-				if (!this.gridster.isMovingOrResizing(this) || this['actualOld_size' + key] === 'auto') {
+				if (!this.gridster.isMovingOrResizing(this) || this['actualOld' + titleCase] === 'auto') {
 					this['setElement' + titleCase]();
 				}
 
@@ -1058,24 +1058,24 @@
 			};
 
 			this.isAutoChangedX = function() {
-				return (this.sizeX === 'auto' && this.actualOld_sizeX !== 'auto')
-					|| (this.sizeX !== 'auto' && this.actualOld_sizeX === 'auto');
+				return (this.sizeX === 'auto' && this.actualOldSizeX !== 'auto') ||
+					(this.sizeX !== 'auto' && this.actualOldSizeX === 'auto');
 			};
 
 			this.isAutoChangedY = function() {
-				return (this.sizeY === 'auto' && this.actualOld_sizeY !== 'auto')
-					|| (this.sizeY !== 'auto' && this.actualOld_sizeY === 'auto');
+				return (this.sizeY === 'auto' && this.actualOldSizeY !== 'auto') ||
+					(this.sizeY !== 'auto' && this.actualOldSizeY === 'auto');
 			};
 
 			/**
 			 * Gets the items sizeY property
 			 */
 			this.getSizeY = function() {
-				const contentSizeY = this.getContentSizeY();
+				var contentSizeY = this.getContentSizeY();
 				return this.sizeY === 'auto' || contentSizeY > this.sizeY ? contentSizeY : this.sizeY;
 			};
 
-			this.getContentSizeY = function () {
+			this.getContentSizeY = function() {
 				return this.gridster.pixelsToRows(this.$element[0].scrollHeight, true);
 			};
 
@@ -1083,9 +1083,9 @@
 			 * Gets the items sizeX property
 			 */
 			this.getSizeX = function() {
-				const contentSizeX = this.getContentSizeX();
+				var contentSizeX = this.getContentSizeX();
 
-				let result = this.sizeX === 'auto' || contentSizeX > this.sizeX ? contentSizeX : this.sizeX;
+				var result = this.sizeX === 'auto' || contentSizeX > this.sizeX ? contentSizeX : this.sizeX;
 
 				if ((this.col + result) > this.gridster.columns) {
 					result = this.gridster.columns - this.col;
@@ -1094,7 +1094,7 @@
 				return result;
 			};
 
-			this.getContentSizeX = function () {
+			this.getContentSizeX = function() {
 				return this.gridster.pixelsToColumns(this.$element[0].scrollWidth, true);
 			};
 
@@ -2270,6 +2270,10 @@
 
 						$el.addClass('gridster-item');
 
+						function capitalizeFirstLetter(string) {
+							return string.charAt(0).toUpperCase() + string.slice(1);
+						}
+
 						var aspects = ['minSizeX', 'maxSizeX', 'minSizeY', 'maxSizeY', 'sizeX', 'sizeY', 'row', 'col'],
 							$getters = {};
 
@@ -2308,11 +2312,11 @@
 						if (options.restrictByContentY != null) {
 							item.restrictByContentY = options.restrictByContentY;
 						}
-						if (!item.actualOld_sizeX) {
-							item.actualOld_sizeX = item.sizeX;
+						if (!item.actualOldSizeX) {
+							item.actualOldSizeX = item.sizeX;
 						}
-						if (!item.actualOld_sizeY) {
-							item.actualOld_sizeY = item.sizeY;
+						if (!item.actualOldSizeY) {
+							item.actualOldSizeY = item.sizeY;
 						}
 
 						var watchExpressions = '{' + expressions.join(',') + '}';
@@ -2325,12 +2329,12 @@
 									continue;
 								}
 								if (newVal === 'auto') {
-									item['actualOld_' + aspect] = item[aspect];
+									item['actualOld' + capitalizeFirstLetter(aspect)] = item[aspect];
 									item[aspect] = newVal;
 								} else {
 									newVal = parseInt(newVal, 10);
 									if (typeof newVal === 'number') {
-										item['actualOld_' + aspect] = item[aspect];
+										item['actualOld' + capitalizeFirstLetter(aspect)] = item[aspect];
 										item[aspect] = newVal;
 									}
 								}
@@ -2389,8 +2393,8 @@
 								item.gridster.moveOverlappingItems(item);
 
 								// refresh resizable handlers if size became auto or was auto
-								if (changedX && (item.sizeX === 'auto' || item.actualOld_sizeX === 'auto')
-									|| changedY && (item.sizeY === 'auto' || item.actualOld_sizeY === 'auto')
+								if (changedX && (item.sizeX === 'auto' || item.actualOldSizeX === 'auto') ||
+									changedY && (item.sizeY === 'auto' || item.actualOldSizeY === 'auto')
 								) {
 									item.resizable.disable();
 									item.resizable.enable();
@@ -2408,7 +2412,7 @@
 							//  - `0.3s` for transition
 							//  - `50ms` for delay
 							// We need to make it slightly higher than 350ms.
-							$timeout(() => {
+							$timeout(function() {
 								if (item.getContentSizeX() + item.col > item.gridster.columns) {
 									item.setSize('Y', item.sizeY + 1);
 									adjustment();
@@ -2424,8 +2428,8 @@
 						scope.$watch(function() {
 							// Same code as `item.getSizeX()`, just need to run additional logic there for `adjustment`,
 							// so need to duplicate that code there.
-							const contentSizeX = item.getContentSizeX();
-							let sizeX = item.sizeX === 'auto' || contentSizeX > item.sizeX ? contentSizeX : item.sizeX;
+							var contentSizeX = item.getContentSizeX();
+							var sizeX = item.sizeX === 'auto' || contentSizeX > item.sizeX ? contentSizeX : item.sizeX;
 
 							if ((item.col + sizeX) > item.gridster.columns) {
 								sizeX = item.gridster.columns - item.col;
@@ -2435,12 +2439,12 @@
 								}
 							}
 
-							return (item.sizeY === 'auto' ? 'auto' : item.getSizeY())
-								+ ',' + (item.sizeX === 'auto' ? 'auto' : sizeX)
-								+ ',' + item.minSizeX
-								+ ',' + item.maxSizeX
-								+ ',' + item.minSizeY
-								+ ',' + item.maxSizeY;
+							return (item.sizeY === 'auto' ? 'auto' : item.getSizeY()) +
+								',' + (item.sizeX === 'auto' ? 'auto' : sizeX) +
+								',' + item.minSizeX +
+								',' + item.maxSizeX +
+								',' + item.minSizeY +
+								',' + item.maxSizeY;
 						}, sizeChanged);
 
 						item.draggable = new GridsterDraggable($el, scope, gridster, item, options);
