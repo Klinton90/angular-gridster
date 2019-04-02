@@ -70,12 +70,12 @@
 				this.resizable = angular.extend({}, gridsterConfig.resizable || {});
 				this.draggable = angular.extend({}, gridsterConfig.draggable || {});
 
-				var layoutChangedInProgress = false;
+				this.layoutChangedInProgress = false;
 				this.layoutChanged = function(heightDelta, callback) {
-					if (layoutChangedInProgress) {
+					if (gridster.layoutChangedInProgress) {
 						return;
 					}
-					layoutChangedInProgress = true;
+					gridster.layoutChangedInProgress = true;
 					$timeout(function() {
 						if (gridster.loaded) {
 							gridster.floatItemsUp();
@@ -84,7 +84,7 @@
 						if (callback) {
 							callback();
 						}
-						layoutChangedInProgress = false;
+						gridster.layoutChangedInProgress = false;
 					}, 30);
 				};
 
@@ -635,9 +635,13 @@
 				 * @param {Number} pixels
 				 * @param {Boolean} ceilOrFloor (Optional) Determines rounding method
 				 */
-				this.pixelsToRows = function(pixels, ceilOrFloor) {
+				this.pixelsToRows = function(pixels, ceilOrFloor, isForDrag) {
 					if (!this.outerMargin) {
-						pixels += this.margins[0] / 2;
+						if (isForDrag) {
+							pixels += this.margins[0] / 2;
+						} else {
+							pixels += this.margins[0];
+						}
 					}
 
 					if (ceilOrFloor === true) {
@@ -974,16 +978,27 @@
 					return;
 				}
 
-				var auto = false;
-				if (value === 'auto') {
-					auto = true;
-					value = this['get' + titleCase]();
+				var auto = value === 'auto';
+				var contentValue = this['getContent' + titleCase]();
+
+				if (auto) {
+					value = contentValue;
+				} else {
+					value = parseInt(value, 10);
+
+					if (isNaN(value) || value === 0) {
+						value = this.gridster['default' + titleCase];
+					}
+
+					if (contentValue > value) {
+						value = contentValue;
+					}
 				}
 
-				value = parseInt(value, 10);
-				if (isNaN(value) || value === 0) {
-					value = this.gridster['default' + titleCase];
+				if (key === 'X' && this.col + value > this.gridster.columns) {
+					value = this.gridster.columns - this.col;
 				}
+
 				var max = key === 'X' ? this.gridster.columns : this.gridster.maxRows;
 				if (this['max' + titleCase]) {
 					max = Math.min(this['max' + titleCase], max);
@@ -1017,7 +1032,7 @@
 					this[camelCase] = value;
 				}
 
-				if (!this.gridster.isMovingOrResizing(this)) {
+				if (!this.gridster.isMovingOrResizing(this) || this['actualOld_size' + key] === 'auto') {
 					this['setElement' + titleCase]();
 				}
 
@@ -1042,24 +1057,45 @@
 				return this.setSize('X', columns);
 			};
 
+			this.isAutoChangedX = function() {
+				return (this.sizeX === 'auto' && this.actualOld_sizeX !== 'auto')
+					|| (this.sizeX !== 'auto' && this.actualOld_sizeX === 'auto');
+			};
+
+			this.isAutoChangedY = function() {
+				return (this.sizeY === 'auto' && this.actualOld_sizeY !== 'auto')
+					|| (this.sizeY !== 'auto' && this.actualOld_sizeY === 'auto');
+			};
+
 			/**
 			 * Gets the items sizeY property
 			 */
 			this.getSizeY = function() {
-				if (this.sizeY === 'auto') {
-					return this.gridster.pixelsToRows((this.$element[0].offsetHeight + this.gridster.margins[0]), true);
-				}
-				return this.sizeY;
+				const contentSizeY = this.getContentSizeY();
+				return this.sizeY === 'auto' || contentSizeY > this.sizeY ? contentSizeY : this.sizeY;
+			};
+
+			this.getContentSizeY = function () {
+				return this.gridster.pixelsToRows(this.$element[0].scrollHeight, true);
 			};
 
 			/**
 			 * Gets the items sizeX property
 			 */
 			this.getSizeX = function() {
-				if (this.sizeX === 'auto') {
-					return this.gridster.pixelsToColumns((this.$element[0].offsetWidth + this.gridster.margins[0]), true);
+				const contentSizeX = this.getContentSizeX();
+
+				let result = this.sizeX === 'auto' || contentSizeX > this.sizeX ? contentSizeX : this.sizeX;
+
+				if ((this.col + result) > this.gridster.columns) {
+					result = this.gridster.columns - this.col;
 				}
-				return this.sizeX;
+
+				return result;
+			};
+
+			this.getContentSizeX = function () {
+				return this.gridster.pixelsToColumns(this.$element[0].scrollWidth, true);
 			};
 
 			/**
@@ -1485,7 +1521,7 @@
 							scrollSensitivity = gridster.draggable.scrollSensitivity,
 							scrollSpeed = gridster.draggable.scrollSpeed;
 
-						var row = Math.min(gridster.pixelsToRows(elmY), gridster.maxRows - 1);
+						var row = Math.min(gridster.pixelsToRows(elmY, null, true), gridster.maxRows - 1);
 						var col = Math.min(gridster.pixelsToColumns(elmX), gridster.columns - 1);
 
 						var itemsInTheWay = gridster.getItems(row, col, item.getSizeX(), item.getSizeY(), item);
@@ -1567,7 +1603,7 @@
 
 					function dragStop(event) {
 						$el.removeClass('gridster-item-moving');
-						var row = Math.min(gridster.pixelsToRows(elmY), gridster.maxRows - 1);
+						var row = Math.min(gridster.pixelsToRows(elmY, null, true), gridster.maxRows - 1);
 						var col = Math.min(gridster.pixelsToColumns(elmX), gridster.columns - 1);
 
 						var itemsInTheWay = gridster.getItems(row, col, item.getSizeX(), item.getSizeY(), item);
@@ -1816,6 +1852,7 @@
 					var getMinHeight = function() {
 						return (item.minSizeY ? item.minSizeY : 1) * gridster.curRowHeight - gridster.margins[0];
 					};
+
 					var getMinWidth = function() {
 						return (item.minSizeX ? item.minSizeX : 1) * gridster.curColWidth - gridster.margins[1];
 					};
@@ -1823,12 +1860,15 @@
 					var isRestrictedH = function() {
 						return item.restrictByContentY && item.$element[0].scrollHeight - lastElmH > 0;
 					};
+
 					var isRestrictedW = function() {
 						return item.restrictByContentX && item.$element[0].scrollWidth - lastElmW > 0;
 					};
+
 					var getElmHByContent = function() {
 						return !isRestrictedH() ? elmH : item.$element[0].scrollHeight;
 					};
+
 					var getElmWByContent = function() {
 						return !isRestrictedW() ? elmW : item.$element[0].scrollWidth;
 					};
@@ -1859,8 +1899,8 @@
 					function resize(e) {
 						var oldRow = item.row,
 							oldCol = item.col,
-							oldSizeX = item.getSizeX(),
-							oldSizeY = item.getSizeY(),
+							oldSizeX = item.sizeX,
+							oldSizeY = item.sizeY,
 							hasCallback = gridster.resizable && gridster.resizable.resize;
 
 						var col = item.col;
@@ -1875,17 +1915,8 @@
 							row = gridster.pixelsToRows(elmY, false);
 						}
 
-						var sizeX = item.getSizeX();
-						// only change row if grabbing left or right edge
-						if (['n', 's'].indexOf(handleClass) === -1) {
-							sizeX = gridster.pixelsToColumns(getElmWByContent(), true);
-						}
-
-						var sizeY = item.getSizeY();
-						// only change row if grabbing top or bottom edge
-						if (['e', 'w'].indexOf(handleClass) === -1) {
-							sizeY = gridster.pixelsToRows(getElmHByContent(), true);
-						}
+						var sizeX = gridster.pixelsToColumns(getElmWByContent(), true);
+						var sizeY = gridster.pixelsToRows(getElmHByContent(), true);
 
 						if (gridster.canItemOccupy(sizeX, sizeY, row, col) && (gridster.pushing !== false || gridster.getItems(row, col, sizeX, sizeY, item).length === 0)) {
 							item.row = row;
@@ -1897,7 +1928,8 @@
 								item.sizeY = sizeY;
 							}
 						}
-						var isChanged = item.row !== oldRow || item.col !== oldCol || item.getSizeX() !== oldSizeX || item.getSizeY() !== oldSizeY;
+
+						var isChanged = item.row !== oldRow || item.col !== oldCol || item.sizeX !== oldSizeX || item.sizeY !== oldSizeY;
 
 						if (hasCallback || isChanged) {
 							scope.$apply(function() {
@@ -1918,7 +1950,7 @@
 						var changedX = item.setSizeY(item.sizeY);
 						var changedY = item.setSizeX(item.sizeX);
 
-						if (changedX || changedY) {
+						if (changedX || changedY || item.isAutoChangedX() || item.isAutoChangedY()) {
 							gridster.moveOverlappingItems(item);
 							// Recalculate grid height, based on new sizes
 							gridster.layoutChanged();
@@ -2044,12 +2076,25 @@
 							'top': elmY + 'px',
 							'left': elmX + 'px'
 						};
+
 						if (item.sizeY !== 'auto') {
-							newStyle.height = getElmHByContent() + 'px';
+							newStyle.height = elmH + 'px';
 						}
 						if (item.sizeX !== 'auto') {
-							newStyle.width = getElmWByContent() + 'px';
+							newStyle.width = elmW + 'px';
 						}
+						$el.css(newStyle);
+
+						if (isRestrictedW() || isRestrictedH()) {
+							if (item.sizeY !== 'auto') {
+								newStyle.height = item.$element[0].scrollHeight + 'px';
+							}
+							if (item.sizeX !== 'auto') {
+								newStyle.width = item.$element[0].scrollWidth + 'px';
+							}
+							$el.css(newStyle);
+						}
+
 						$el.css(newStyle);
 
 						resize(e);
@@ -2181,8 +2226,8 @@
 		 * @param GridsterResizable
 		 * @param gridsterDebounce
 		 */
-		.directive('gridsterItem', ['$parse', 'GridsterDraggable', 'GridsterResizable', 'gridsterDebounce',
-			function($parse, GridsterDraggable, GridsterResizable, gridsterDebounce) {
+		.directive('gridsterItem', ['$parse', '$timeout', 'GridsterDraggable', 'GridsterResizable', 'gridsterDebounce',
+			function($parse, $timeout, GridsterDraggable, GridsterResizable, gridsterDebounce) {
 				return {
 					scope: true,
 					restrict: 'EA',
@@ -2263,6 +2308,12 @@
 						if (options.restrictByContentY != null) {
 							item.restrictByContentY = options.restrictByContentY;
 						}
+						if (!item.actualOld_sizeX) {
+							item.actualOld_sizeX = item.sizeX;
+						}
+						if (!item.actualOld_sizeY) {
+							item.actualOld_sizeY = item.sizeY;
+						}
 
 						var watchExpressions = '{' + expressions.join(',') + '}';
 						// when the value changes externally, update the internal item object
@@ -2273,9 +2324,15 @@
 								if (oldVal === newVal) {
 									continue;
 								}
-								newVal = parseInt(newVal, 10);
-								if (typeof newVal === 'number' || newVal === 'auto') {
+								if (newVal === 'auto') {
+									item['actualOld_' + aspect] = item[aspect];
 									item[aspect] = newVal;
+								} else {
+									newVal = parseInt(newVal, 10);
+									if (typeof newVal === 'number') {
+										item['actualOld_' + aspect] = item[aspect];
+										item[aspect] = newVal;
+									}
 								}
 							}
 						});
@@ -2297,11 +2354,16 @@
 						}, positionChanged);
 
 						function sizeChanged() {
-							var changedX = item.setSizeX(item.sizeX);
+							if (item.adjustmentInProgress) {
+								return;
+							}
+
+							var changedX = item.setSizeX(item.sizeX) || item.isAutoChangedX();
 							if (changedX && $getters.sizeX && $getters.sizeX.assign) {
 								$getters.sizeX.assign(scope, item.sizeX);
 							}
-							var changedY = item.setSizeY(item.sizeY);
+
+							var changedY = item.setSizeY(item.sizeY) || item.isAutoChangedY();
 							if (changedY && $getters.sizeY && $getters.sizeY.assign) {
 								$getters.sizeY.assign(scope, item.sizeY);
 							}
@@ -2325,24 +2387,72 @@
 									gridster.layoutChanged();
 								}
 								item.gridster.moveOverlappingItems(item);
+
+								// refresh resizable handlers if size became auto or was auto
+								if (changedX && (item.sizeX === 'auto' || item.actualOld_sizeX === 'auto')
+									|| changedY && (item.sizeY === 'auto' || item.actualOld_sizeY === 'auto')
+								) {
+									item.resizable.disable();
+									item.resizable.enable();
+								}
+
 								scope.$broadcast('gridster-item-resized', item);
 							}
 						}
 
+						function adjustment() {
+							item.adjustmentInProgress = true;
+
+							// Timeout value is based on on css transitions.
+							// Default value defined in css are:
+							//  - `0.3s` for transition
+							//  - `50ms` for delay
+							// We need to make it slightly higher than 350ms.
+							$timeout(() => {
+								if (item.getContentSizeX() + item.col > item.gridster.columns) {
+									item.setSize('Y', item.sizeY + 1);
+									adjustment();
+								} else {
+									item.adjustmentInProgress = false;
+									gridster.layoutChanged();
+									item.gridster.moveOverlappingItems(item);
+									scope.$broadcast('gridster-item-resized', item);
+								}
+							});
+						}
+
 						scope.$watch(function() {
-							return item.getSizeY() + ',' + item.getSizeX() + ',' + item.minSizeX + ',' + item.maxSizeX + ',' + item.minSizeY + ',' + item.maxSizeY;
+							// Same code as `item.getSizeX()`, just need to run additional logic there for `adjustment`,
+							// so need to duplicate that code there.
+							const contentSizeX = item.getContentSizeX();
+							let sizeX = item.sizeX === 'auto' || contentSizeX > item.sizeX ? contentSizeX : item.sizeX;
+
+							if ((item.col + sizeX) > item.gridster.columns) {
+								sizeX = item.gridster.columns - item.col;
+
+								if (!item.gridster.movingOrResizingItem && !item.gridster.layoutChangedInProgress && !item.adjustmentInProgress) {
+									adjustment();
+								}
+							}
+
+							return (item.sizeY === 'auto' ? 'auto' : item.getSizeY())
+								+ ',' + (item.sizeX === 'auto' ? 'auto' : sizeX)
+								+ ',' + item.minSizeX
+								+ ',' + item.maxSizeX
+								+ ',' + item.minSizeY
+								+ ',' + item.maxSizeY;
 						}, sizeChanged);
 
-						var draggable = new GridsterDraggable($el, scope, gridster, item, options);
-						var resizable = new GridsterResizable($el, scope, gridster, item, options);
+						item.draggable = new GridsterDraggable($el, scope, gridster, item, options);
+						item.resizable = new GridsterResizable($el, scope, gridster, item, options);
 
 						var updateResizable = function() {
-							resizable.toggle(!gridster.isMobile && gridster.resizable && gridster.resizable.enabled);
+							item.resizable.toggle(!gridster.isMobile && gridster.resizable && gridster.resizable.enabled);
 						};
 						updateResizable();
 
 						var updateDraggable = function() {
-							draggable.toggle(!gridster.isMobile && gridster.draggable && gridster.draggable.enabled);
+							item.draggable.toggle(!gridster.isMobile && gridster.draggable && gridster.draggable.enabled);
 						};
 						updateDraggable();
 
@@ -2381,8 +2491,8 @@
 
 						return scope.$on('$destroy', function() {
 							try {
-								resizable.destroy();
-								draggable.destroy();
+								item.resizable.destroy();
+								item.draggable.destroy();
 							} catch (e) {}
 
 							try {
