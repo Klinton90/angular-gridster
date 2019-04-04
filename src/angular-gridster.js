@@ -923,6 +923,7 @@
 			this.maxSizeY = null;
 			this.restrictByContentX = false;
 			this.restrictByContentY = false;
+			this.adjustmentInProgress = 0;
 
 			this.init = function($element, gridster) {
 				this.$element = $element;
@@ -2405,24 +2406,27 @@
 						}
 
 						function adjustment() {
-							item.adjustmentInProgress = true;
+							while (item.adjustmentInProgress < 50 && item.getContentSizeX() + item.col > item.gridster.columns) {
+								item.adjustmentInProgress++;
+								item.setSize('Y', item.sizeY + 1);
+							}
 
-							// Timeout value is based on on css transitions.
-							// Default value defined in css are:
-							//  - `0.3s` for transition
-							//  - `50ms` for delay
-							// We need to make it slightly higher than 350ms.
-							$timeout(function() {
-								if (item.getContentSizeX() + item.col > item.gridster.columns) {
-									item.setSize('Y', item.sizeY + 1);
-									adjustment();
-								} else {
-									item.adjustmentInProgress = false;
-									gridster.layoutChanged();
-									item.gridster.moveOverlappingItems(item);
-									scope.$broadcast('gridster-item-resized', item);
-								}
-							});
+							if (item.adjustmentInProgress >= 50) {
+								throw new Error('One of gridster widgets causes infinite loop. ' +
+									'Stop attempting to fit size for it to prevent browser from crashing.' +
+									'Check so initial widget size has meaningful value based on amount of content you have.' +
+									'Also it might be related to HTML/CSS that you are using.' +
+									'Looks like it cause widget content to grow indefinitely.' +
+									'Try to remove `height: 100%` or use `max-height` property.' +
+									'This logic runs when there is not enough HORIZONTAL space inside of widget to fit all contents.' +
+									'So make sure widget content can fit into browser page or can auto adjust item potision.' +
+									'E.g. try to use CSS grid or flexbox.');
+							} else {
+								item.adjustmentInProgress = 0;
+								gridster.layoutChanged();
+								item.gridster.moveOverlappingItems(item);
+								scope.$broadcast('gridster-item-resized', item);
+							}
 						}
 
 						scope.$watch(function() {
@@ -2439,8 +2443,8 @@
 								}
 							}
 
-							return (item.sizeY === 'auto' ? 'auto' : item.getSizeY()) +
-								',' + (item.sizeX === 'auto' ? 'auto' : sizeX) +
+							return (item.sizeY === 'auto' && item.actualOldSizeY !== 'auto' ? 'auto' : item.getSizeY()) +
+								',' + (item.sizeX === 'auto' && item.actualOldSizeX !== 'auto' ? 'auto' : sizeX) +
 								',' + item.minSizeX +
 								',' + item.maxSizeX +
 								',' + item.minSizeY +
