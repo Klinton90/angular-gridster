@@ -845,6 +845,7 @@
 							var prevWidth = $elem[0].offsetWidth || parseInt($elem.css('width'), 10);
 
 							var resize = function() {
+								gridster.$resizeInProgress = true;
 								var width = $elem[0].offsetWidth || parseInt($elem.css('width'), 10);
 
 								if (!width || width === prevWidth || gridster.movingOrResizingItem) {
@@ -869,6 +870,7 @@
 							var onResize = gridsterDebounce(function onResize() {
 								resize();
 								$timeout(function() {
+									gridster.$resizeInProgress = false;
 									scope.$apply();
 								});
 							}, 100);
@@ -2438,7 +2440,10 @@
 							if ((item.col + sizeX) > item.gridster.columns) {
 								sizeX = item.gridster.columns - item.col;
 
-								if (!item.gridster.movingOrResizingItem && !item.gridster.layoutChangedInProgress && !item.adjustmentInProgress) {
+								if (!item.gridster.movingOrResizingItem
+									&& !item.gridster.layoutChangedInProgress
+									&& !item.adjustmentInProgress
+									&& !item.gridster.$resizeInProgress) {
 									adjustment();
 								}
 							}
