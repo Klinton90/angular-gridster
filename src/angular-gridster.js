@@ -1128,9 +1128,13 @@
 			 */
 			this.setElementSizeY = function() {
 				if ((this.gridster.isMobile && !this.gridster.saveGridItemCalculatedHeightInMobile) || this.sizeY === 'auto') {
-					this.$element.css('height', '');
+					this.$element
+						.css('height', '')
+						.addClass('auto-height');
 				} else {
-					this.$element.css('height', (this.getSizeY() * this.gridster.curRowHeight - this.gridster.margins[0]) + 'px');
+					this.$element
+						.css('height', (this.getSizeY() * this.gridster.curRowHeight - this.gridster.margins[0]) + 'px')
+						.removeClass('auto-height');
 				}
 			};
 
