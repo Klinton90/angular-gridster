@@ -753,11 +753,18 @@
 									return;
 								}
 
+								var curWidth;
 								// resolve "auto" & "match" values
 								if (gridster.width === 'auto') {
-									gridster.curWidth = $elem[0].offsetWidth || parseInt($elem.css('width'), 10);
+									curWidth = $elem[0].offsetWidth || parseInt($elem.css('width'), 10);
 								} else {
-									gridster.curWidth = gridster.width;
+									curWidth = gridster.width;
+								}
+
+								if (curWidth) {
+									gridster.curWidth = curWidth;
+								} else {
+									return;
 								}
 
 								if (gridster.colWidth === 'auto') {
