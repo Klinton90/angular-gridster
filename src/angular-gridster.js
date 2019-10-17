@@ -70,13 +70,12 @@
 				this.resizable = angular.extend({}, gridsterConfig.resizable || {});
 				this.draggable = angular.extend({}, gridsterConfig.draggable || {});
 
-				this.layoutChangedInProgress = false;
+				this.layoutChangedInProgress = null;
 				this.layoutChanged = function(heightDelta, callback) {
 					if (gridster.layoutChangedInProgress) {
-						return;
+						$timeout.cancel(gridster.layoutChangedInProgress);
 					}
-					gridster.layoutChangedInProgress = true;
-					$timeout(function() {
+					gridster.layoutChangedInProgress = $timeout(function() {
 						if (gridster.loaded) {
 							gridster.floatItemsUp();
 						}
@@ -84,7 +83,7 @@
 						if (callback) {
 							callback();
 						}
-						gridster.layoutChangedInProgress = false;
+						gridster.layoutChangedInProgress = null;
 					}, 30);
 				};
 
@@ -1526,6 +1525,8 @@
 								gridster.draggable.start(event, $el, itemOptions, item);
 							}
 						});
+
+						scope.$broadcast('gridster-item-drag-start', item);
 					}
 
 					function drag(event) {
@@ -1648,6 +1649,8 @@
 								gridster.draggable.stop(event, $el, itemOptions, item);
 							}
 						});
+
+						scope.$broadcast('gridster-item-drag-stop', item);
 					}
 
 					function mouseDown(e) {
@@ -2419,11 +2422,6 @@
 						}
 
 						function adjustment() {
-							while (item.adjustmentInProgress < 50 && item.getContentSizeX() + item.col > item.gridster.columns) {
-								item.adjustmentInProgress++;
-								item.setSize('Y', item.sizeY + 1);
-							}
-
 							if (item.adjustmentInProgress >= 50) {
 								throw new Error('One of gridster widgets causes infinite loop. ' +
 									'Stop attempting to fit size for it to prevent browser from crashing.' +
@@ -2434,11 +2432,21 @@
 									'This logic runs when there is not enough HORIZONTAL space inside of widget to fit all contents.' +
 									'So make sure widget content can fit into browser page or can auto adjust item potision.' +
 									'E.g. try to use CSS grid or flexbox.');
+							}
+
+							if (item.adjustmentInProgress < 50 && item.getContentSizeX() + item.col > item.gridster.columns) {
+								item.adjustmentInProgress++;
+								item.setSizeY(item.sizeY + 1);
+								$timeout(adjustment);
 							} else {
 								item.adjustmentInProgress = 0;
-								gridster.layoutChanged();
-								item.gridster.moveOverlappingItems(item);
-								scope.$broadcast('gridster-item-resized', item);
+								if (item.actualOldSizeY === 'auto' && item.sizeY !== item.actualOldSizeY) {
+									item.sizeY = item.actualOldSizeY;
+								}
+								if (item.actualOldSizeX === 'auto' && item.sizeX !== item.actualOldSizeX) {
+									item.sizeX = item.actualOldSizeX;
+								}
+								sizeChanged();
 							}
 						}
 
